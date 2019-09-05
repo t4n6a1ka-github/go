@@ -6,6 +6,8 @@ package gc
 
 import (
 	"cmd/compile/internal/types"
+	"cmd/internal/src"
+	"fmt"
 	"math/big"
 	"strings"
 )
@@ -1040,9 +1042,15 @@ func setconst(n *Node, v Val) {
 	overflow(v, n.Type)
 	lineno = lno
 
-	// Truncate precision for non-ideal float.
-	if v.Ctype() == CTFLT && n.Type.Etype != TIDEAL {
-		n.SetVal(Val{truncfltlit(v.U.(*Mpflt), n.Type)})
+	if !n.Type.IsUntyped() {
+		switch v.Ctype() {
+		// Truncate precision for non-ideal float.
+		case CTFLT:
+			n.SetVal(Val{truncfltlit(v.U.(*Mpflt), n.Type)})
+		// Truncate precision for non-ideal complex.
+		case CTCPLX:
+			n.SetVal(Val{trunccmplxlit(v.U.(*Mpcplx), n.Type)})
+		}
 	}
 }
 
@@ -1397,7 +1405,7 @@ func hascallchan(n *Node) bool {
 
 // A constSet represents a set of Go constant expressions.
 type constSet struct {
-	m map[constSetKey]*Node
+	m map[constSetKey]src.XPos
 }
 
 type constSetKey struct {
@@ -1405,20 +1413,22 @@ type constSetKey struct {
 	val interface{}
 }
 
-// add adds constant expressions to s. If a constant expression of
-// equal value and identical type has already been added, then that
-// type expression is returned. Otherwise, add returns nil.
+// add adds constant expression n to s. If a constant expression of
+// equal value and identical type has already been added, then add
+// reports an error about the duplicate value.
 //
-// add also returns nil if n is not a Go constant expression.
+// pos provides position information for where expression n occured
+// (in case n does not have its own position information). what and
+// where are used in the error message.
 //
 // n must not be an untyped constant.
-func (s *constSet) add(n *Node) *Node {
+func (s *constSet) add(pos src.XPos, n *Node, what, where string) {
 	if n.Op == OCONVIFACE && n.Implicit() {
 		n = n.Left
 	}
 
 	if !n.isGoConst() {
-		return nil
+		return
 	}
 	if n.Type.IsUntyped() {
 		Fatalf("%v is untyped", n)
@@ -1448,12 +1458,32 @@ func (s *constSet) add(n *Node) *Node {
 	}
 	k := constSetKey{typ, n.Val().Interface()}
 
+	if hasUniquePos(n) {
+		pos = n.Pos
+	}
+
 	if s.m == nil {
-		s.m = make(map[constSetKey]*Node)
+		s.m = make(map[constSetKey]src.XPos)
 	}
-	old, dup := s.m[k]
-	if !dup {
-		s.m[k] = n
+
+	if prevPos, isDup := s.m[k]; isDup {
+		yyerrorl(pos, "duplicate %s %s in %s\n\tprevious %s at %v",
+			what, nodeAndVal(n), where,
+			what, linestr(prevPos))
+	} else {
+		s.m[k] = pos
 	}
-	return old
+}
+
+// nodeAndVal reports both an expression and its constant value, if
+// the latter is non-obvious.
+//
+// TODO(mdempsky): This could probably be a fmt.go flag.
+func nodeAndVal(n *Node) string {
+	show := n.String()
+	val := n.Val().Interface()
+	if s := fmt.Sprintf("%#v", val); show != s {
+		show += " (value " + s + ")"
+	}
+	return show
 }
