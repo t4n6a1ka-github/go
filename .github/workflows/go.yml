@@ -1,4 +1,4 @@
-name: Awt *
+name: Go
 on: [push]
 jobs:
 
