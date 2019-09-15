@@ -1,4 +1,4 @@
-import: java.awt.*;
+name: java.awt.*;
 
 on: [push]
 
