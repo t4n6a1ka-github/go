@@ -164,14 +164,8 @@ var vcsGit = &vcsCmd{
 	// See golang.org/issue/9032.
 	tagSyncDefault: []string{"submodule update --init --recursive"},
 
-	scheme: []string{"git", "https", "http", "git+ssh", "ssh"},
-
-	// Leave out the '--' separator in the ls-remote command: git 2.7.4 does not
-	// support such a separator for that command, and this use should be safe
-	// without it because the {scheme} value comes from the predefined list above.
-	// See golang.org/issue/33836.
-	pingCmd: "ls-remote {scheme}://{repo}",
-
+	scheme:     []string{"git", "https", "http", "git+ssh", "ssh"},
+	pingCmd:    "ls-remote -- {scheme}://{repo}",
 	remoteRepo: gitRemoteRepo,
 }
 
@@ -904,7 +898,7 @@ func metaImportsForPrefix(importPrefix string, mod ModuleMode, security web.Secu
 		}
 		resp, err := web.Get(security, url)
 		if err != nil {
-			return setCache(fetchResult{url: url, err: fmt.Errorf("fetching %s: %v", importPrefix, err)})
+			return setCache(fetchResult{url: url, err: fmt.Errorf("fetch %s: %v", resp.URL, err)})
 		}
 		body := resp.Body
 		defer body.Close()
@@ -913,7 +907,7 @@ func metaImportsForPrefix(importPrefix string, mod ModuleMode, security web.Secu
 			return setCache(fetchResult{url: url, err: fmt.Errorf("parsing %s: %v", resp.URL, err)})
 		}
 		if len(imports) == 0 {
-			err = fmt.Errorf("fetching %s: no go-import meta tag found in %s", importPrefix, resp.URL)
+			err = fmt.Errorf("fetch %s: no go-import meta tag", url)
 		}
 		return setCache(fetchResult{url: url, imports: imports, err: err})
 	})

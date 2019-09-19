@@ -14,7 +14,7 @@ const debugSelect = false
 
 // scase.kind values.
 // Known to compiler.
-// Changes here must also be made in src/cmd/compile/internal/gc/select.go's walkselectcases.
+// Changes here must also be made in src/cmd/compile/internal/gc/select.go's walkselect.
 const (
 	caseNil = iota
 	caseRecv
@@ -493,6 +493,8 @@ sclose:
 }
 
 func (c *hchan) sortkey() uintptr {
+	// TODO(khr): if we have a moving garbage collector, we'll need to
+	// change this function.
 	return uintptr(unsafe.Pointer(c))
 }
 

@@ -4,6 +4,7 @@
 
 // +build !plan9
 // +build !solaris
+// +build !windows
 // +build !nacl
 // +build !freebsd
 // +build !darwin
@@ -11,4 +12,4 @@
 
 package runtime
 
-func nanotime1() int64
+func nanotime() int64

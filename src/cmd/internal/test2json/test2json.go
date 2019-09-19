@@ -284,7 +284,7 @@ func (c *converter) flushReport(depth int) {
 func (c *converter) Close() error {
 	c.input.flush()
 	c.output.flush()
-	e := &event{Action: "pass"}
+	e := &event{Action: "fail"}
 	if c.result != "" {
 		e.Action = c.result
 	}

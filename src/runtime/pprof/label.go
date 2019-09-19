@@ -60,11 +60,11 @@ func Labels(args ...string) LabelSet {
 	if len(args)%2 != 0 {
 		panic("uneven number of arguments to pprof.Labels")
 	}
-	list := make([]label, 0, len(args)/2)
+	labels := LabelSet{}
 	for i := 0; i+1 < len(args); i += 2 {
-		list = append(list, label{key: args[i], value: args[i+1]})
+		labels.list = append(labels.list, label{key: args[i], value: args[i+1]})
 	}
-	return LabelSet{list: list}
+	return labels
 }
 
 // Label returns the value of the label with the given key on ctx, and a boolean indicating

@@ -1,4 +1,4 @@
-// errorcheck -0 -N -m -l
+// errorcheck -0 -N -m -l -newescape=true
 
 // Copyright 2016 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style

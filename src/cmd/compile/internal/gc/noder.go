@@ -309,10 +309,6 @@ func (p *noder) decls(decls []syntax.Decl) (l []*Node) {
 }
 
 func (p *noder) importDecl(imp *syntax.ImportDecl) {
-	if imp.Path.Bad {
-		return // avoid follow-on errors if there was a syntax error
-	}
-
 	val := p.basicLit(imp.Path)
 	ipkg := importfile(&val)
 
@@ -606,9 +602,7 @@ func (p *noder) expr(expr syntax.Expr) *Node {
 	case *syntax.Name:
 		return p.mkname(expr)
 	case *syntax.BasicLit:
-		n := nodlit(p.basicLit(expr))
-		n.SetDiag(expr.Bad) // avoid follow-on errors if there was a syntax error
-		return n
+		return nodlit(p.basicLit(expr))
 	case *syntax.CompositeLit:
 		n := p.nod(expr, OCOMPLIT, nil, nil)
 		if expr.Type != nil {
@@ -1357,60 +1351,55 @@ func checkLangCompat(lit *syntax.BasicLit) {
 }
 
 func (p *noder) basicLit(lit *syntax.BasicLit) Val {
-	// We don't use the errors of the conversion routines to determine
-	// if a literal string is valid because the conversion routines may
-	// accept a wider syntax than the language permits. Rely on lit.Bad
-	// instead.
+	// TODO: Don't try to convert if we had syntax errors (conversions may fail).
+	//       Use dummy values so we can continue to compile. Eventually, use a
+	//       form of "unknown" literals that are ignored during type-checking so
+	//       we can continue type-checking w/o spurious follow-up errors.
 	switch s := lit.Value; lit.Kind {
 	case syntax.IntLit:
 		checkLangCompat(lit)
 		x := new(Mpint)
-		if !lit.Bad {
-			x.SetString(s)
-		}
+		x.SetString(s)
 		return Val{U: x}
 
 	case syntax.FloatLit:
 		checkLangCompat(lit)
 		x := newMpflt()
-		if !lit.Bad {
-			x.SetString(s)
-		}
+		x.SetString(s)
 		return Val{U: x}
 
 	case syntax.ImagLit:
 		checkLangCompat(lit)
 		x := newMpcmplx()
-		if !lit.Bad {
-			x.Imag.SetString(strings.TrimSuffix(s, "i"))
-		}
+		x.Imag.SetString(strings.TrimSuffix(s, "i"))
 		return Val{U: x}
 
 	case syntax.RuneLit:
-		x := new(Mpint)
-		x.Rune = true
-		if !lit.Bad {
-			u, _ := strconv.Unquote(s)
-			var r rune
+		var r rune
+		if u, err := strconv.Unquote(s); err == nil && len(u) > 0 {
+			// Package syntax already reported any errors.
+			// Check for them again though because 0 is a
+			// better fallback value for invalid rune
+			// literals than 0xFFFD.
 			if len(u) == 1 {
 				r = rune(u[0])
 			} else {
 				r, _ = utf8.DecodeRuneInString(u)
 			}
-			x.SetInt64(int64(r))
 		}
+		x := new(Mpint)
+		x.SetInt64(int64(r))
+		x.Rune = true
 		return Val{U: x}
 
 	case syntax.StringLit:
-		var x string
-		if !lit.Bad {
-			if len(s) > 0 && s[0] == '`' {
-				// strip carriage returns from raw string
-				s = strings.Replace(s, "\r", "", -1)
-			}
-			x, _ = strconv.Unquote(s)
+		if len(s) > 0 && s[0] == '`' {
+			// strip carriage returns from raw string
+			s = strings.Replace(s, "\r", "", -1)
 		}
-		return Val{U: x}
+		// Ignore errors because package syntax already reported them.
+		u, _ := strconv.Unquote(s)
+		return Val{U: u}
 
 	default:
 		panic("unhandled BasicLit kind")

@@ -3,7 +3,17 @@
 
 package ssa
 
+import "fmt"
+import "math"
+import "cmd/internal/obj"
+import "cmd/internal/objabi"
 import "cmd/compile/internal/types"
+
+var _ = fmt.Println   // in case not otherwise used
+var _ = math.MinInt8  // in case not otherwise used
+var _ = obj.ANOP      // in case not otherwise used
+var _ = objabi.GOROOT // in case not otherwise used
+var _ = types.TypeMem // in case not otherwise used
 
 func rewriteValuedec64(v *Value) bool {
 	switch v.Op {
@@ -2716,6 +2726,11 @@ func rewriteValuedec64_OpZeroExt8to64_0(v *Value) bool {
 	}
 }
 func rewriteBlockdec64(b *Block) bool {
+	config := b.Func.Config
+	typ := &config.Types
+	_ = typ
+	v := b.Control
+	_ = v
 	switch b.Kind {
 	}
 	return false

@@ -282,13 +282,7 @@ func TestEarlySignalHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	darwin := "0"
-	if runtime.GOOS == "darwin" {
-		darwin = "1"
-	}
-	cmd = exec.Command(bin[0], append(bin[1:], darwin)...)
-
-	if out, err := cmd.CombinedOutput(); err != nil {
+	if out, err := exec.Command(bin[0], bin[1:]...).CombinedOutput(); err != nil {
 		t.Logf("%s", out)
 		t.Fatal(err)
 	}
@@ -326,15 +320,12 @@ func TestSignalForwarding(t *testing.T) {
 	t.Logf("%s", out)
 	expectSignal(t, err, syscall.SIGSEGV)
 
-	// SIGPIPE is never forwarded on darwin. See golang.org/issue/33384.
-	if runtime.GOOS != "darwin" {
-		// Test SIGPIPE forwarding
-		cmd = exec.Command(bin[0], append(bin[1:], "3")...)
+	// Test SIGPIPE forwarding
+	cmd = exec.Command(bin[0], append(bin[1:], "3")...)
 
-		out, err = cmd.CombinedOutput()
-		t.Logf("%s", out)
-		expectSignal(t, err, syscall.SIGPIPE)
-	}
+	out, err = cmd.CombinedOutput()
+	t.Logf("%s", out)
+	expectSignal(t, err, syscall.SIGPIPE)
 }
 
 func TestSignalForwardingExternal(t *testing.T) {
@@ -753,20 +744,11 @@ func TestCompileWithoutShared(t *testing.T) {
 	}
 	defer os.Remove(exe)
 
-	binArgs := append(cmdToRun(exe), "1")
+	binArgs := append(cmdToRun(exe), "3")
 	t.Log(binArgs)
 	out, err = exec.Command(binArgs[0], binArgs[1:]...).CombinedOutput()
 	t.Logf("%s", out)
-	expectSignal(t, err, syscall.SIGSEGV)
-
-	// SIGPIPE is never forwarded on darwin. See golang.org/issue/33384.
-	if runtime.GOOS != "darwin" {
-		binArgs := append(cmdToRun(exe), "3")
-		t.Log(binArgs)
-		out, err = exec.Command(binArgs[0], binArgs[1:]...).CombinedOutput()
-		t.Logf("%s", out)
-		expectSignal(t, err, syscall.SIGPIPE)
-	}
+	expectSignal(t, err, syscall.SIGPIPE)
 }
 
 // Test that installing a second time recreates the header files.

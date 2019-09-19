@@ -20,7 +20,7 @@ package ssa
 func branchelim(f *Func) {
 	// FIXME: add support for lowering CondSelects on more architectures
 	switch f.Config.arch {
-	case "arm64", "amd64", "wasm":
+	case "arm64", "amd64":
 		// implemented
 	default:
 		return

@@ -1,4 +1,4 @@
-// errorcheck -0 -m -l
+// errorcheck -0 -m -l -newescape=true
 
 // Copyright 2015 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
@@ -38,7 +38,7 @@ func ClosureCallArgs2() {
 func ClosureCallArgs3() {
 	x := 0         // ERROR "moved to heap: x"
 	func(p *int) { // ERROR "leaking param: p" "func literal does not escape"
-		sink = p
+		sink = p // ERROR "p escapes to heap"
 	}(&x)
 }
 
@@ -53,7 +53,7 @@ func ClosureCallArgs5() {
 	x := 0                     // ERROR "moved to heap: x"
 	// TODO(mdempsky): We get "leaking param: p" here because the new escape analysis pass
 	// can tell that p flows directly to sink, but it's a little weird. Re-evaluate.
-	sink = func(p *int) *int { // ERROR "leaking param: p" "func literal does not escape"
+	sink = func(p *int) *int { // ERROR "leaking param: p" "func literal does not escape" "\(func literal\)\(&x\) escapes to heap"
 		return p
 	}(&x)
 }
@@ -61,7 +61,7 @@ func ClosureCallArgs5() {
 func ClosureCallArgs6() {
 	x := 0         // ERROR "moved to heap: x"
 	func(p *int) { // ERROR "moved to heap: p" "func literal does not escape"
-		sink = &p
+		sink = &p // ERROR "&p escapes to heap"
 	}(&x)
 }
 
@@ -105,7 +105,7 @@ func ClosureCallArgs10() {
 func ClosureCallArgs11() {
 	x := 0               // ERROR "moved to heap: x"
 	defer func(p *int) { // ERROR "leaking param: p" "func literal does not escape"
-		sink = p
+		sink = p // ERROR "p escapes to heap"
 	}(&x)
 }
 
@@ -119,7 +119,7 @@ func ClosureCallArgs12() {
 func ClosureCallArgs13() {
 	x := 0               // ERROR "moved to heap: x"
 	defer func(p *int) { // ERROR "moved to heap: p" "func literal does not escape"
-		sink = &p
+		sink = &p // ERROR "&p escapes to heap"
 	}(&x)
 }
 
@@ -134,7 +134,7 @@ func ClosureCallArgs14() {
 func ClosureCallArgs15() {
 	x := 0                      // ERROR "moved to heap: x"
 	p := &x
-	sink = func(p **int) *int { // ERROR "leaking param content: p" "func literal does not escape"
+	sink = func(p **int) *int { // ERROR "leaking param content: p" "func literal does not escape" "\(func literal\)\(&p\) escapes to heap"
 		return *p
 	}(&p)
 }

@@ -36,7 +36,6 @@ type scanner struct {
 	line, col uint
 	tok       token
 	lit       string   // valid if tok is _Name, _Literal, or _Semi ("semicolon", "newline", or "EOF")
-	bad       bool     // valid if tok is _Literal, true if a syntax error occurred, lit may be incorrect
 	kind      LitKind  // valid if tok is _Literal
 	op        Operator // valid if tok is _Operator, _AssignOp, or _IncOp
 	prec      int      // valid if tok is _Operator, _AssignOp, or _IncOp
@@ -48,18 +47,8 @@ func (s *scanner) init(src io.Reader, errh func(line, col uint, msg string), mod
 	s.nlsemi = false
 }
 
-// errorf reports an error at the most recently read character position.
 func (s *scanner) errorf(format string, args ...interface{}) {
-	// TODO(gri) Consider using s.bad to consistently suppress multiple errors
-	//           per token, here and below.
-	s.bad = true
 	s.error(fmt.Sprintf(format, args...))
-}
-
-// errorAtf reports an error at a byte column offset relative to the current token start.
-func (s *scanner) errorAtf(offset int, format string, args ...interface{}) {
-	s.bad = true
-	s.errh(s.line, s.col+uint(offset), fmt.Sprintf(format, args...))
 }
 
 // next advances the scanner by reading the next token.
@@ -453,7 +442,6 @@ func (s *scanner) digits(c0 rune, base int, invalid *int) (c rune, digsep int) {
 
 func (s *scanner) number(c rune) {
 	s.startLit()
-	s.bad = false
 
 	base := 10        // number base
 	prefix := rune(0) // one of 0 (decimal), '0' (0-octal), 'x', 'o', or 'b'
@@ -489,14 +477,14 @@ func (s *scanner) number(c rune) {
 	if c == '.' {
 		s.kind = FloatLit
 		if prefix == 'o' || prefix == 'b' {
-			s.errorf("invalid radix point in %s", litname(prefix))
+			s.error("invalid radix point in " + litname(prefix))
 		}
 		c, ds = s.digits(s.getr(), base, &invalid)
 		digsep |= ds
 	}
 
 	if digsep&1 == 0 {
-		s.errorf("%s has no digits", litname(prefix))
+		s.error(litname(prefix) + " has no digits")
 	}
 
 	// exponent
@@ -515,10 +503,10 @@ func (s *scanner) number(c rune) {
 		c, ds = s.digits(c, 10, nil)
 		digsep |= ds
 		if ds&1 == 0 {
-			s.errorf("exponent has no digits")
+			s.error("exponent has no digits")
 		}
 	} else if prefix == 'x' && s.kind == FloatLit {
-		s.errorf("hexadecimal mantissa requires a 'p' exponent")
+		s.error("hexadecimal mantissa requires a 'p' exponent")
 	}
 
 	// suffix 'i'
@@ -533,12 +521,12 @@ func (s *scanner) number(c rune) {
 	s.tok = _Literal
 
 	if s.kind == IntLit && invalid >= 0 {
-		s.errorAtf(invalid, "invalid digit %q in %s", s.lit[invalid], litname(prefix))
+		s.errh(s.line, s.col+uint(invalid), fmt.Sprintf("invalid digit %q in %s", s.lit[invalid], litname(prefix)))
 	}
 
 	if digsep&2 != 0 {
 		if i := invalidSep(s.lit); i >= 0 {
-			s.errorAtf(i, "'_' must separate successive digits")
+			s.errh(s.line, s.col+uint(i), "'_' must separate successive digits")
 		}
 	}
 }
@@ -597,8 +585,8 @@ func invalidSep(x string) int {
 
 func (s *scanner) rune() {
 	s.startLit()
-	s.bad = false
 
+	ok := true // only report errors if we're ok so far
 	n := 0
 	for ; ; n++ {
 		r := s.getr()
@@ -606,29 +594,33 @@ func (s *scanner) rune() {
 			break
 		}
 		if r == '\\' {
-			s.escape('\'')
+			if !s.escape('\'') {
+				ok = false
+			}
 			continue
 		}
 		if r == '\n' {
 			s.ungetr() // assume newline is not part of literal
-			if !s.bad {
-				s.errorf("newline in character literal")
+			if ok {
+				s.error("newline in character literal")
+				ok = false
 			}
 			break
 		}
 		if r < 0 {
-			if !s.bad {
-				s.errorAtf(0, "invalid character literal (missing closing ')")
+			if ok {
+				s.errh(s.line, s.col, "invalid character literal (missing closing ')")
+				ok = false
 			}
 			break
 		}
 	}
 
-	if !s.bad {
+	if ok {
 		if n == 0 {
-			s.errorf("empty character literal or unescaped ' in character literal")
+			s.error("empty character literal or unescaped ' in character literal")
 		} else if n != 1 {
-			s.errorAtf(0, "invalid character literal (more than one character)")
+			s.errh(s.line, s.col, "invalid character literal (more than one character)")
 		}
 	}
 
@@ -640,7 +632,6 @@ func (s *scanner) rune() {
 
 func (s *scanner) stdString() {
 	s.startLit()
-	s.bad = false
 
 	for {
 		r := s.getr()
@@ -653,11 +644,11 @@ func (s *scanner) stdString() {
 		}
 		if r == '\n' {
 			s.ungetr() // assume newline is not part of literal
-			s.errorf("newline in string")
+			s.error("newline in string")
 			break
 		}
 		if r < 0 {
-			s.errorAtf(0, "string not terminated")
+			s.errh(s.line, s.col, "string not terminated")
 			break
 		}
 	}
@@ -670,7 +661,6 @@ func (s *scanner) stdString() {
 
 func (s *scanner) rawString() {
 	s.startLit()
-	s.bad = false
 
 	for {
 		r := s.getr()
@@ -678,7 +668,7 @@ func (s *scanner) rawString() {
 			break
 		}
 		if r < 0 {
-			s.errorAtf(0, "string not terminated")
+			s.errh(s.line, s.col, "string not terminated")
 			break
 		}
 	}
@@ -751,7 +741,7 @@ func (s *scanner) skipComment(r rune) bool {
 		}
 		r = s.getr()
 	}
-	s.errorAtf(0, "comment not terminated")
+	s.errh(s.line, s.col, "comment not terminated")
 	return false
 }
 
@@ -792,14 +782,14 @@ func (s *scanner) fullComment() {
 	}
 }
 
-func (s *scanner) escape(quote rune) {
+func (s *scanner) escape(quote rune) bool {
 	var n int
 	var base, max uint32
 
 	c := s.getr()
 	switch c {
 	case 'a', 'b', 'f', 'n', 'r', 't', 'v', '\\', quote:
-		return
+		return true
 	case '0', '1', '2', '3', '4', '5', '6', '7':
 		n, base, max = 3, 8, 255
 	case 'x':
@@ -813,10 +803,10 @@ func (s *scanner) escape(quote rune) {
 		n, base, max = 8, 16, unicode.MaxRune
 	default:
 		if c < 0 {
-			return // complain in caller about EOF
+			return true // complain in caller about EOF
 		}
-		s.errorf("unknown escape sequence")
-		return
+		s.error("unknown escape sequence")
+		return false
 	}
 
 	var x uint32
@@ -830,7 +820,7 @@ func (s *scanner) escape(quote rune) {
 		}
 		if d >= base {
 			if c < 0 {
-				return // complain in caller about EOF
+				return true // complain in caller about EOF
 			}
 			kind := "hex"
 			if base == 8 {
@@ -838,7 +828,7 @@ func (s *scanner) escape(quote rune) {
 			}
 			s.errorf("non-%s character in escape sequence: %c", kind, c)
 			s.ungetr()
-			return
+			return false
 		}
 		// d < base
 		x = x*base + d
@@ -848,10 +838,13 @@ func (s *scanner) escape(quote rune) {
 
 	if x > max && base == 8 {
 		s.errorf("octal escape value > 255: %d", x)
-		return
+		return false
 	}
 
 	if x > max || 0xD800 <= x && x < 0xE000 /* surrogate range */ {
-		s.errorf("escape sequence is invalid Unicode code point %#U", x)
+		s.error("escape sequence is invalid Unicode code point")
+		return false
 	}
+
+	return true
 }

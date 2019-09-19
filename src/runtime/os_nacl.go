@@ -289,9 +289,6 @@ func closeonexec(int32)                                   {}
 // gsignalStack is unused on nacl.
 type gsignalStack struct{}
 
-// nacl fake time support - time in nanoseconds since 1970
-var faketime int64
-
 var writelock uint32 // test-and-set spin lock for write
 
 // lastfaketime stores the last faketime value written to fd 1 or 2.
@@ -302,8 +299,6 @@ var lastfaketime int64
 // Subsequent writes to the same fd may use the same timestamp,
 // but the timestamp must increase if the fd changes.
 var lastfaketimefd int32
-
-func walltime() (sec int64, nsec int32)
 
 /*
 An attempt at IRT. Doesn't work. See end of sys_nacl_amd64.s.

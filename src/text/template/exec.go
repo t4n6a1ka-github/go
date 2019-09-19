@@ -5,6 +5,7 @@
 package template
 
 import (
+	"bytes"
 	"fmt"
 	"internal/fmtsort"
 	"io"
@@ -229,19 +230,21 @@ func (t *Template) DefinedTemplates() string {
 	if t.common == nil {
 		return ""
 	}
-	var b strings.Builder
+	var b bytes.Buffer
 	for name, tmpl := range t.tmpl {
 		if tmpl.Tree == nil || tmpl.Root == nil {
 			continue
 		}
-		if b.Len() == 0 {
-			b.WriteString("; defined templates are: ")
-		} else {
+		if b.Len() > 0 {
 			b.WriteString(", ")
 		}
 		fmt.Fprintf(&b, "%q", name)
 	}
-	return b.String()
+	var s string
+	if b.Len() > 0 {
+		s = "; defined templates are: " + b.String()
+	}
+	return s
 }
 
 // Walk functions step through the major pieces of the template structure,

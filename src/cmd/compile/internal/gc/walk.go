@@ -15,7 +15,6 @@ import (
 
 // The constant is known to runtime.
 const tmpstringbufsize = 32
-const zeroValSize = 1024 // must match value of runtime/map.go:maxZero
 
 func walk(fn *Node) {
 	Curfn = fn
@@ -757,7 +756,7 @@ opswitch:
 		//   a = *var
 		a := n.List.First()
 
-		if w := t.Elem().Width; w <= zeroValSize {
+		if w := t.Elem().Width; w <= 1024 { // 1024 must match runtime/map.go:maxZero
 			fn := mapfn(mapaccess2[fast], t)
 			r = mkcall1(fn, fn.Type.Results(), init, typename(t), r.Left, key)
 		} else {
@@ -1094,7 +1093,7 @@ opswitch:
 				key = nod(OADDR, key, nil)
 			}
 
-			if w := t.Elem().Width; w <= zeroValSize {
+			if w := t.Elem().Width; w <= 1024 { // 1024 must match runtime/map.go:maxZero
 				n = mkcall1(mapfn(mapaccess1[fast], t), types.NewPtr(t.Elem()), init, typename(t), map_, key)
 			} else {
 				z := zeroaddr(w)
@@ -3050,18 +3049,20 @@ func walkcompare(n *Node, init *Nodes) *Node {
 	n.Left = walkexpr(n.Left, init)
 	n.Right = walkexpr(n.Right, init)
 
-	// Given mixed interface/concrete comparison,
-	// rewrite into types-equal && data-equal.
+	// Given interface value l and concrete value r, rewrite
+	//   l == r
+	// into types-equal && data-equal.
 	// This is efficient, avoids allocations, and avoids runtime calls.
-	if n.Left.Type.IsInterface() != n.Right.Type.IsInterface() {
-		// Preserve side-effects in case of short-circuiting; see #32187.
-		l := cheapexpr(n.Left, init)
-		r := cheapexpr(n.Right, init)
-		// Swap so that l is the interface value and r is the concrete value.
-		if n.Right.Type.IsInterface() {
-			l, r = r, l
-		}
+	var l, r *Node
+	if n.Left.Type.IsInterface() && !n.Right.Type.IsInterface() {
+		l = n.Left
+		r = n.Right
+	} else if !n.Left.Type.IsInterface() && n.Right.Type.IsInterface() {
+		l = n.Right
+		r = n.Left
+	}
 
+	if l != nil {
 		// Handle both == and !=.
 		eq := n.Op
 		andor := OOROR

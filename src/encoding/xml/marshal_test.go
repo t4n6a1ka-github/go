@@ -392,6 +392,7 @@ func stringptr(x string) *string {
 
 type T1 struct{}
 type T2 struct{}
+type T3 struct{}
 
 type IndirComment struct {
 	T1      T1

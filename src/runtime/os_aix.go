@@ -323,7 +323,7 @@ const (
 )
 
 //go:nosplit
-func nanotime1() int64 {
+func nanotime() int64 {
 	tp := &timespec{}
 	if clock_gettime(_CLOCK_REALTIME, tp) != 0 {
 		throw("syscall clock_gettime failed")
@@ -331,7 +331,7 @@ func nanotime1() int64 {
 	return tp.tv_sec*1000000000 + tp.tv_nsec
 }
 
-func walltime1() (sec int64, nsec int32) {
+func walltime() (sec int64, nsec int32) {
 	ts := &timespec{}
 	if clock_gettime(_CLOCK_REALTIME, ts) != 0 {
 		throw("syscall clock_gettime failed")

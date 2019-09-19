@@ -20,7 +20,11 @@ const (
 	m4 = 15839092249703872147
 )
 
-func memhashFallback(p unsafe.Pointer, seed, s uintptr) uintptr {
+func memhash(p unsafe.Pointer, seed, s uintptr) uintptr {
+	if (GOARCH == "amd64" || GOARCH == "arm64") &&
+		GOOS != "nacl" && useAeshash {
+		return aeshash(p, seed, s)
+	}
 	h := uint64(seed + s*hashkey[0])
 tail:
 	switch {
@@ -78,7 +82,7 @@ tail:
 	return uintptr(h)
 }
 
-func memhash32Fallback(p unsafe.Pointer, seed uintptr) uintptr {
+func memhash32(p unsafe.Pointer, seed uintptr) uintptr {
 	h := uint64(seed + 4*hashkey[0])
 	v := uint64(readUnaligned32(p))
 	h ^= v
@@ -90,7 +94,7 @@ func memhash32Fallback(p unsafe.Pointer, seed uintptr) uintptr {
 	return uintptr(h)
 }
 
-func memhash64Fallback(p unsafe.Pointer, seed uintptr) uintptr {
+func memhash64(p unsafe.Pointer, seed uintptr) uintptr {
 	h := uint64(seed + 8*hashkey[0])
 	h ^= uint64(readUnaligned32(p)) | uint64(readUnaligned32(add(p, 4)))<<32
 	h = rotl_31(h*m1) * m2

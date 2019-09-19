@@ -499,10 +499,6 @@ func TestNumbers(t *testing.T) {
 			err = ""
 			s.next()
 
-			if err != "" && !s.bad {
-				t.Errorf("%q: got error but bad not set", test.src)
-			}
-
 			// compute lit where where s.lit is not defined
 			var lit string
 			switch s.tok {
@@ -602,7 +598,7 @@ func TestScanErrors(t *testing.T) {
 		{`"\x`, "string not terminated", 0, 0},
 		{`"\x"`, "non-hex character in escape sequence: \"", 0, 3},
 		{`var s string = "\x"`, "non-hex character in escape sequence: \"", 0, 18},
-		{`return "\Uffffffff"`, "escape sequence is invalid Unicode code point U+FFFFFFFF", 0, 18},
+		{`return "\Uffffffff"`, "escape sequence is invalid Unicode code point", 0, 18},
 
 		// former problem cases
 		{"package p\n\n\xef", "invalid UTF-8 encoding", 2, 0},

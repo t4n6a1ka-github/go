@@ -298,10 +298,21 @@ func (r *importReader) doDecl(n *Node) {
 
 		// We also need to defer width calculations until
 		// after the underlying type has been assigned.
-		defercheckwidth()
+		//
+		// TODO(mdempsky): Add nesting support directly to
+		// {defer,resume}checkwidth? Width calculations are
+		// already deferred during initial typechecking, but
+		// not when we're expanding inline function bodies, so
+		// we currently need to handle both cases here.
+		deferring := defercalc != 0
+		if !deferring {
+			defercheckwidth()
+		}
 		underlying := r.typ()
-		setUnderlying(t, underlying)
-		resumecheckwidth()
+		copytype(typenod(t), underlying)
+		if !deferring {
+			resumecheckwidth()
+		}
 
 		if underlying.IsInterface() {
 			break

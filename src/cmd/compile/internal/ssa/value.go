@@ -183,7 +183,7 @@ func (v *Value) auxString() string {
 		if v.Aux != nil {
 			return fmt.Sprintf(" {%v}", v.Aux)
 		}
-	case auxSymOff, auxTypSize:
+	case auxSymOff, auxSymInt32, auxTypSize:
 		s := ""
 		if v.Aux != nil {
 			s = fmt.Sprintf(" {%v}", v.Aux)

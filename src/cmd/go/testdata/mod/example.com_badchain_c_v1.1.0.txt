@@ -1,7 +1,7 @@
 example.com/badchain/c v1.1.0
 
 -- .mod --
-module badchain.example.com/c
+module example.com/badchain/wrong
 -- .info --
 {"Version":"v1.1.0"}
 -- c.go --
