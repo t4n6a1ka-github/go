@@ -1,3 +1,11 @@
+//
+
+// License: https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+
+// See page 218.
+
+//displays an animation while computing the 45th Fibonacci number.
 package main
 
 import (
